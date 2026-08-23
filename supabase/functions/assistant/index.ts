@@ -11,12 +11,16 @@ const corsHeaders = {
 
 // @ts-ignore
 serve(async (req: Request) => {
+    console.log("Request received");
+
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
 
     try {
-        const { message, context } = await req.json();
+        const body = await req.json();
+        console.log("Body:", body);
+        const { message, context } = body;
 
         // @ts-ignore
         const apiKey = Deno.env.get("GEMINI_API_KEY");
@@ -79,7 +83,7 @@ ${message}
         );
 
     } catch (err) {
-        console.error(err);
+        console.error("JSON error or general error:", err);
         return new Response(
             JSON.stringify({ error: "Assistant is unavailable right now." }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
