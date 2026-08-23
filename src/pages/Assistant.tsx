@@ -22,8 +22,9 @@ export default function Assistant() {
     setInput("");
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not logged in");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not logged in");
+      const user = session.user;
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
       const { data: todayTasks } = await supabase.from("tasks").select("title,status,start_time,end_time").eq("task_date", todayStr());
       const { data: pending } = await supabase.from("tasks").select("title,task_date").eq("status", "pending").lt("task_date", todayStr());
@@ -41,6 +42,9 @@ export default function Assistant() {
 
       const { data, error } = await supabase.functions.invoke("assistant", {
         body: { message: userMsg, context },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
       if (error) throw error;
       setMessages((m) => [...m, { role: "assistant", text: data?.reply || data?.error || "No response." }]);

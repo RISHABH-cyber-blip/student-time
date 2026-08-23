@@ -11,6 +11,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  async function signInWithGoogle() {
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}/dashboard` },
+  });
+}
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -57,6 +64,19 @@ export default function Login() {
         </button>
         <button type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")} className="w-full text-muted text-xs">
           {mode === "login" ? "No account? Sign up" : "Already have an account? Log in"}
+        </button>
+        <div className="flex items-center gap-2 my-4">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted">or</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        <button
+          type="button"
+          onClick={signInWithGoogle}
+          className="w-full bg-surface2 border border-border rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2"
+        >
+          Continue with Google
         </button>
       </motion.form>
     </div>
