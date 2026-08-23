@@ -23,7 +23,14 @@ export default function Assistant() {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not logged in");
+      
+      console.log("Access Token:", session?.access_token);
+
+      if (!session) {
+        alert("User not logged in");
+        return;
+      }
+
       const user = session.user;
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
       const { data: todayTasks } = await supabase.from("tasks").select("title,status,start_time,end_time").eq("task_date", todayStr());
@@ -43,7 +50,7 @@ export default function Assistant() {
       const { data, error } = await supabase.functions.invoke("assistant", {
         body: { message: userMsg, context },
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session?.access_token}`,
         },
       });
       if (error) throw error;
