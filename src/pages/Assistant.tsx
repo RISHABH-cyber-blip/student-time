@@ -21,17 +21,22 @@ export default function Assistant() {
     setMessages((m) => [...m, { role: "user", text: userMsg }]);
     setInput("");
     setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      console.log("Access Token:", session?.access_token);
 
-      if (!session) {
-        alert("User not logged in");
+    try {
+      // Use getUser() to ensure a fresh session and verify token validity
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      console.log("SESSION:", session);
+      console.log("USER:", user);
+
+      if (!session || !user) {
+        alert("Please log in to use the assistant.");
+        setLoading(false);
         return;
       }
 
-      const user = session.user;
+      console.log("Session found, fetching context...");
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
       const { data: todayTasks } = await supabase.from("tasks").select("title,status,start_time,end_time").eq("task_date", todayStr());
       const { data: pending } = await supabase.from("tasks").select("title,task_date").eq("status", "pending").lt("task_date", todayStr());
@@ -49,14 +54,13 @@ export default function Assistant() {
 
       const { data, error } = await supabase.functions.invoke("assistant", {
         body: { message: userMsg, context },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
       });
       if (error) throw error;
+
       setMessages((m) => [...m, { role: "assistant", text: data?.reply || data?.error || "No response." }]);
-    } catch (err) {
-      setMessages((m) => [...m, { role: "assistant", text: "Something went wrong reaching the assistant." }]);
+    } catch (err: any) {
+      console.error("Catch error:", err);
+      setMessages((m) => [...m, { role: "assistant", text: err.message || "Something went wrong reaching the assistant." }]);
     } finally {
       setLoading(false);
     }
