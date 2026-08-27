@@ -1,8 +1,8 @@
 // Deploy with: supabase functions deploy assistant
 
 // @ts-ignore
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-ignore
 import { GoogleGenerativeAI } from "npm:@google/generative-ai@0.21.0";
 
 const corsHeaders = {
@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 // @ts-ignore
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
     console.log("Request received");
     const authHeader = req.headers.get("Authorization");
     console.log("Auth Header:", authHeader);
