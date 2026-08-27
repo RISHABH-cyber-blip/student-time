@@ -10,7 +10,7 @@ function dayOfWeek(d: string): number {
   return new Date(d + "T00:00:00").getDay();
 }
 
-interface DayStat { date: string; completed: number; total: number; rate: number; }
+interface DayStat { date: string; completed: number; total: number; rate: number; rejected?: number; }
 
 export default function Dashboard() {
   const [todayEvents, setTodayEvents] = useState<TimetableEvent[]>([]);
@@ -34,22 +34,24 @@ export default function Dashboard() {
     const sinceStr = since.toISOString().slice(0, 10);
     const { data: recentTasks } = await supabase.from("tasks").select("task_date,status").gte("task_date", sinceStr).lte("task_date", todayStr());
 
-    const byDate: Record<string, { total: number; done: number }> = {};
+    const byDate: Record<string, { total: number; done: number; rejected: number }> = {};
     (recentTasks || []).forEach((t: any) => {
-      byDate[t.task_date] = byDate[t.task_date] || { total: 0, done: 0 };
+      byDate[t.task_date] = byDate[t.task_date] || { total: 0, done: 0, rejected: 0 };
       byDate[t.task_date].total += 1;
       if (t.status === "done") byDate[t.task_date].done += 1;
+      if (t.status === "rejected") byDate[t.task_date].rejected += 1;
     });
     const days: DayStat[] = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      const stat = byDate[key] || { total: 0, done: 0 };
+      const stat = byDate[key] || { total: 0, done: 0, rejected: 0 };
       days.push({
         date: key.slice(5),
         completed: stat.done,
         total: stat.total,
         rate: stat.total ? Math.round((stat.done / stat.total) * 100) : 0,
+        rejected: stat.rejected,
       });
     }
     setWeekStats(days);

@@ -124,8 +124,17 @@ export default function Timetable() {
           {d.events.map((ev) => (
             <div key={ev.id} className="flex items-center gap-3 bg-surface2 rounded-lg px-3 py-2 mb-2" style={{ borderLeft: `3px solid ${ev.color}` }}>
               <span className="font-mono text-xs text-muted min-w-[90px]">{ev.start_time}–{ev.end_time}</span>
-              <span className="text-sm flex-1">{ev.subject}</span>
-              <button onClick={() => deleteEvent(ev.id)} className="text-muted text-xs">✕</button>
+                <span className="text-sm flex-1">{ev.subject}</span>
+                <button
+                    onClick={async () => {
+                        await supabase.from("timetable_events").update({ alarm_enabled: !ev.alarm_enabled }).eq("id", ev.id);
+                        load();
+                    }}
+                    className={`text-xs px-2 py-1 rounded-lg ${ev.alarm_enabled ? "bg-mint text-ink" : "bg-ink border border-border text-muted"}`}
+                >
+                    {ev.alarm_enabled ? "🔔 On" : "🔕 Off"}
+                </button>
+                <button onClick={() => deleteEvent(ev.id)} className="text-muted text-xs">✕</button>
             </div>
           ))}
         </div>

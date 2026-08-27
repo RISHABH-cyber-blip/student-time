@@ -52,7 +52,7 @@ export default function Tasks() {
       const slot = findFreeSlot(busy, dur, prof.wake_time, prof.sleep_time);
       if (slot) {
         await supabase.from("tasks").update({ task_date: todayStr(), start_time: slot.start, end_time: slot.end }).eq("id", t.id);
-        busy.push(slot);
+        busy.push({ start_time: slot.start, end_time: slot.end });
       }
     }
   }
@@ -193,7 +193,14 @@ export default function Tasks() {
               )}
               <div className="flex-1">
                 <div className={`text-sm ${t.status === "done" ? "line-through opacity-50" : ""}`}>{t.title}</div>
-                {t.start_time && <div className="font-mono text-xs text-muted">{t.start_time} – {t.end_time}</div>}
+                  {t.start_time && (
+                      <button
+                          onClick={async () => { await supabase.from("tasks").update({ alarm_enabled: !t.alarm_enabled }).eq("id", t.id); loadAll(); }}
+                          className={`text-xs mt-1 px-2 py-0.5 rounded-lg inline-block ${t.alarm_enabled ? "bg-mint text-ink" : "bg-ink border border-border text-muted"}`}
+                      >
+                          {t.alarm_enabled ? "🔔 Alarm on" : "🔕 Alarm off"}
+                      </button>
+                  )}
                 {tab === "pending" && <div className="text-xs text-coral">overdue from {t.task_date}</div>}
                 {tab === "later" && <div className="text-xs text-muted">parked since {t.original_date}</div>}
               </div>

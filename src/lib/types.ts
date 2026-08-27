@@ -16,9 +16,10 @@ export interface TimetableEvent {
   end_time: string;
   subject: string;
   color: string;
+  alarm_enabled: boolean;
 }
 
-export type TaskStatus = "pending" | "done" | "skipped" | "later";
+export type TaskStatus = "pending" | "done" | "skipped" | "later" | "rejected";
 
 export interface Task {
   id: string;
@@ -32,6 +33,7 @@ export interface Task {
   priority: "low" | "normal" | "high";
   original_date: string | null;
   created_at: string;
+  alarm_enabled: boolean;
 }
 
 export interface ScheduleBlock {

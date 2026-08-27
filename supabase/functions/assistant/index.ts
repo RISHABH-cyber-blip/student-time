@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 // @ts-ignore
-Deno.serve(async (req: Request) => {
+Deno.serve(async (req: any) => {
     console.log("Request received");
     const authHeader = req.headers.get("Authorization");
     console.log("Auth Header:", authHeader);

@@ -1,53 +1,85 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { todayStr } from "@/lib/scheduling";
+import AlarmRingModal, { RingingItem } from "./AlarmRingModal";
 
 function dow(): number {
-  return new Date().getDay();
+    return new Date().getDay();
 }
 
 export default function AlarmWatcher() {
-  const fired = useRef<Set<string>>(new Set());
+    const [ringing, setRinging] = useState<RingingItem | null>(null);
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const beepIntervalRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "default") Notification.requestPermission();
-
-    const interval = setInterval(async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-      const { data: classes } = await supabase
-        .from("timetable_events")
-        .select("*")
-        .eq("day_of_week", dow())
-        .eq("start_time", hhmm);
-      const { data: tasks } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("task_date", todayStr())
-        .eq("start_time", hhmm)
-        .eq("status", "pending");
-
-      const items = [
-        ...(classes || []).map((c: any) => ({ id: "c-" + c.id, label: c.subject })),
-        ...(tasks || []).map((t: any) => ({ id: "t-" + t.id, label: t.title })),
-      ];
-
-      items.forEach((item) => {
-        const key = item.id + todayStr();
-        if (!fired.current.has(key) && Notification.permission === "granted") {
-          fired.current.add(key);
-          new Notification("Orbit", { body: `Starting now — ${item.label}` });
+    function startRingtone() {
+        const ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+        function beep() {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 880;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
         }
-      });
-    }, 20000);
+        beep();
+        beepIntervalRef.current = window.setInterval(beep, 700);
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    function stopRingtone() {
+        if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
+        audioCtxRef.current?.close();
+        audioCtxRef.current = null;
+    }
 
-  return null;
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            if (ringing) return; // already ringing something, wait for user action
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const now = new Date();
+            const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+            const { data: classes } = await supabase
+                .from("timetable_events").select("*")
+                .eq("day_of_week", dow()).eq("start_time", hhmm).eq("alarm_enabled", true);
+            const { data: tasks } = await supabase
+                .from("tasks").select("*")
+                .eq("task_date", todayStr()).eq("start_time", hhmm)
+                .eq("status", "pending").eq("alarm_enabled", true);
+
+            if (classes && classes.length > 0) {
+                setRinging({ id: classes[0].id, kind: "class", label: classes[0].subject });
+            } else if (tasks && tasks.length > 0) {
+                setRinging({ id: tasks[0].id, kind: "task", label: tasks[0].title });
+            }
+        }, 15000);
+        return () => clearInterval(interval);
+    }, [ringing]);
+
+    useEffect(() => {
+        if (ringing) startRingtone();
+        return () => stopRingtone();
+    }, [ringing]);
+
+    async function handleTick() {
+        if (!ringing) return;
+        await supabase.from("tasks").update({ status: "done" }).eq("id", ringing.id);
+        setRinging(null);
+    }
+    async function handleReject() {
+        if (!ringing) return;
+        await supabase.from("tasks").update({ status: "rejected" }).eq("id", ringing.id);
+        setRinging(null);
+    }
+    function handleDismiss() {
+        setRinging(null);
+    }
+
+    if (!ringing) return null;
+    return <AlarmRingModal item={ringing} onTick={handleTick} onReject={handleReject} onDismiss={handleDismiss} />;
 }
