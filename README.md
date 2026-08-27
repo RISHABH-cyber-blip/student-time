@@ -3,7 +3,7 @@
 Same app as before, rebuilt on Vite instead of Next.js:
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind + Framer Motion + react-router-dom
 - **Backend**: Supabase (auth, Postgres, Edge Functions)
-- **AI**: Anthropic API, called from two Supabase Edge Functions (so your API key never
+- **AI**: Google Gemini API, called from two Supabase Edge Functions (so your API key never
   reaches the browser)
 
 ---
@@ -11,7 +11,7 @@ Same app as before, rebuilt on Vite instead of Next.js:
 ## 0. What you need
 - A free [Supabase](https://supabase.com) account
 - A free [Vercel](https://vercel.com) or [Netlify](https://netlify.com) account
-- An [Anthropic API key](https://console.anthropic.com)
+- A [Google Gemini API key](https://aistudio.google.com)
 - [Node.js](https://nodejs.org) v18+ installed
 - The [Supabase CLI](https://supabase.com/docs/guides/cli) — installed via:
   ```bash
@@ -37,7 +37,7 @@ From inside this project folder:
 ```bash
 supabase login
 supabase link --project-ref YOUR-PROJECT-REF   # find this in your Supabase project URL
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-your-key-here
+supabase secrets set GEMINI_API_KEY=AQ.your-key-here
 supabase functions deploy parse-timetable
 supabase functions deploy assistant
 ```

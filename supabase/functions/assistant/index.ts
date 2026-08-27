@@ -3,6 +3,7 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { GoogleGenerativeAI } from "npm:@google/generative-ai@0.21.0";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -34,9 +35,8 @@ serve(async (req: Request) => {
             );
         }
 
-        if (!apiKey.startsWith("AIza")) {
-            console.warn("GEMINI_API_KEY does not start with AIza. It might be invalid.");
-        }
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
         const system = `You are Orbit, an embedded assistant inside a student's schedule app.
 You can see a summary of the student's timetable, tasks, and goals below.
@@ -51,48 +51,10 @@ User message:
 ${message}
 `;
 
-        // 🔥 Gemini API call
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            parts: [{ text: system }],
-                        },
-                    ],
-                }),
-            }
-        );
-
-        let data;
-        try {
-            data = await resp.json();
-        } catch (e) {
-            console.error("Failed to parse Gemini response:", e);
-            data = { error: { message: "Invalid JSON from Gemini" } };
-        }
-        
-        console.log("Gemini response status:", resp.status);
-
-        if (!resp.ok) {
-            console.error("Gemini API error detail:", JSON.stringify(data));
-            return new Response(
-                JSON.stringify({ 
-                    error: `Gemini Error (${resp.status}): ${data?.error?.message || "Check your API key"}`,
-                    status: resp.status,
-                    code: data?.error?.status || "API_ERROR"
-                }),
-                { status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
-
-        const reply =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response";
+        // 🔥 Gemini SDK call
+        const result = await model.generateContent(system);
+        const response = await result.response;
+        const reply = response.text() || "No response";
 
         return new Response(
             JSON.stringify({ reply }),
