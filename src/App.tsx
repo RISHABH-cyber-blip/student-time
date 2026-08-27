@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Timetable from "@/pages/Timetable";
 import Tasks from "@/pages/Tasks";
 import Assistant from "@/pages/Assistant";
+import EnableAlarmsBanner from "@/components/EnableAlarmsBanner";
 
 function ProtectedRoute({ session, children }: { session: Session | null; children: React.ReactNode }) {
   if (session === undefined) return null; // still loading
@@ -29,6 +30,7 @@ export default function App() {
     <div className="max-w-5xl mx-auto px-4 pb-24">
       {session && <AlarmWatcher />}
       <Nav session={session ?? null} />
+        {session && <EnableAlarmsBanner />}
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/dashboard" element={<ProtectedRoute session={session ?? null}><Dashboard /></ProtectedRoute>} />

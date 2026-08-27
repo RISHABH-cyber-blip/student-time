@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { todayStr } from "@/lib/scheduling";
 import AlarmRingModal, { RingingItem } from "./AlarmRingModal";
+import { getAudioContext, isUnlocked } from "@/lib/audioUnlock";
 
 function dow(): number {
     return new Date().getDay();
@@ -13,15 +14,15 @@ export default function AlarmWatcher() {
     const beepIntervalRef = useRef<number | null>(null);
 
     function startRingtone() {
-        const ctx = new AudioContext();
-        audioCtxRef.current = ctx;
+        if (!isUnlocked()) return; // can't play sound until the user has tapped Enable once
+        const ctx = getAudioContext();
         function beep() {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.frequency.value = 880;
             osc.connect(gain);
             gain.connect(ctx.destination);
-            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
             osc.start();
             osc.stop(ctx.currentTime + 0.25);
         }
@@ -31,8 +32,6 @@ export default function AlarmWatcher() {
 
     function stopRingtone() {
         if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
-        audioCtxRef.current?.close();
-        audioCtxRef.current = null;
     }
 
     useEffect(() => {
