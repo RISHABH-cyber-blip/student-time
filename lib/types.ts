@@ -17,6 +17,7 @@ export interface TimetableEvent {
   subject: string;
   color: string;
   alarm_enabled: boolean;
+  notif_id: string | null;
 }
 
 export type TaskStatus = "pending" | "done" | "skipped" | "later" | "rejected";
@@ -34,6 +35,7 @@ export interface Task {
   original_date: string | null;
   created_at: string;
   alarm_enabled: boolean;
+  notif_id: string | null;
 }
 
 export interface ScheduleBlock {

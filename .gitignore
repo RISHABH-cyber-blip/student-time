@@ -1,6 +1,10 @@
-node_modules
-dist
-.env
-.env.local
-.vercel
-*.log
+node_modules/
+.expo/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env*
+android/
+ios/
+.expo/

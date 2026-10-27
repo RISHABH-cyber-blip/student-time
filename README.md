@@ -1,125 +1,71 @@
-# Orbit — React + TypeScript + Vite edition
+# Orbit — Student Schedule & Alarm App
 
-Same app as before, rebuilt on Vite instead of Next.js:
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind + Framer Motion + react-router-dom
-- **Backend**: Supabase (auth, Postgres, Edge Functions)
-- **AI**: Google Gemini API, called from two Supabase Edge Functions (so your API key never
-  reaches the browser)
+A smart student companion app built with **Expo SDK 58, React Native 0.88, Expo Router, Supabase, and Google Gemini AI**.
 
 ---
 
-## 0. What you need
-- A free [Supabase](https://supabase.com) account
-- A free [Vercel](https://vercel.com) or [Netlify](https://netlify.com) account
-- A [Google Gemini API key](https://aistudio.google.com)
-- [Node.js](https://nodejs.org) v18+ installed
-- The [Supabase CLI](https://supabase.com/docs/guides/cli) — installed via:
-  ```bash
-  npm install -g supabase
-  ```
+## 🌟 Key Features
+
+1. **Dashboard (`app/(tabs)/dashboard.tsx`)**:
+   - Today's unified schedule: classes and tasks displayed chronologically with color tags.
+   - Overdue tasks counter.
+   - 7-day completion rate & rejection bar chart.
+   - Streak detection and proactive workload suggestions.
+
+2. **Timetable & AI OCR (`app/(tabs)/timetable.tsx`)**:
+   - Photo upload of syllabus/college timetable — parsed instantly using Google Gemini vision OCR via Supabase Edge Function `parse-timetable`.
+   - Automatic weekly recurring local alarms scheduled for every detected class.
+   - Manual class entry with day selector, start/end time, and subject.
+   - Individual alarm toggle switch per class.
+
+3. **Smart Task Scheduler (`app/(tabs)/tasks.tsx`)**:
+   - 3 tabs: **Today / Pending / Later**.
+   - Automatic overdue task rollover on startup into free schedule slots.
+   - Smart slot finder (`lib/scheduling.ts`) that squeezes tasks into free time or intelligently trims sleep time when packed.
+   - Task action controls: **Shift** (new slot today), **Skip** (auto-scheduled for tomorrow), **Later** (parked), **Reject**, **Delete**, and **Restore**.
+   - Individual notification alarm toggle switch.
+   - Safe in-app scheduled alarm debugger.
+
+4. **AI Assistant (`app/(tabs)/assistant.tsx`)**:
+   - Embedded student AI coach connected to Supabase Edge Function `assistant`.
+   - Full student context: profile goals, field of study, sleep/wake hours, today's classes, today's tasks, overdue tasks.
+
+5. **True Native Background Alarms (`lib/notifications.ts`, `lib/resyncAlarms.ts`)**:
+   - Powered by `expo-notifications` with maximum priority channel, sound, and vibration.
+   - Safe dynamic import wrapper preventing crashes on Android in Expo Go.
+   - Session startup alarm resync: clears obsolete alerts and reschedules all active classes and pending tasks.
 
 ---
 
-## 1. Set up the Supabase project
-1. supabase.com → **New project**. Save your DB password somewhere.
-2. **SQL Editor → New query** → paste the entire contents of `supabase/schema.sql` → **Run**.
-   This creates `profiles`, `timetable_events`, `tasks`, `daily_stats` with row-level security
-   so each user only ever sees their own rows.
-3. **Project Settings → API** → copy your **Project URL** and **anon public** key.
-4. (Optional while testing) **Authentication → Settings** → turn off "Confirm email" so you can
-   sign up and log in immediately.
+## 🚀 Quick Start
 
----
-
-## 2. Deploy the two Edge Functions (this is what replaces Next.js's API routes)
-From inside this project folder:
-
+### 1. Install Dependencies
 ```bash
-supabase login
-supabase link --project-ref YOUR-PROJECT-REF   # find this in your Supabase project URL
-supabase secrets set GEMINI_API_KEY=AQ.your-key-here
+npm install
+```
+
+### 2. Configure Credentials (`app.json`)
+Verify `app.json` contains your Supabase project URL and anon public key under `expo.extra`:
+```json
+"extra": {
+  "supabaseUrl": "https://YOUR-PROJECT.supabase.co",
+  "supabaseAnonKey": "your-anon-public-key"
+}
+```
+
+### 3. Deploy Supabase Edge Functions (Optional if already live)
+From inside this project directory:
+```bash
+supabase link --project-ref YOUR-PROJECT-REF
+supabase secrets set GEMINI_API_KEY=your-gemini-key
 supabase functions deploy parse-timetable
 supabase functions deploy assistant
 ```
 
-That's it — `parse-timetable` and `assistant` are now live serverless functions on Supabase's
-infrastructure, and the frontend calls them with `supabase.functions.invoke(...)`, which
-automatically attaches the logged-in user's auth token.
-
----
-
-## 3. Local development
+### 4. Run the Mobile App
 ```bash
-npm install
-cp .env.example .env      # then fill in your real Supabase URL + anon key
-npm run dev
+npx expo start
 ```
-Open http://localhost:5173
-
----
-
-## 4. Push to GitHub
-```bash
-git init
-git add .
-git commit -m "Orbit — Vite + TS"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
-git push -u origin main
-```
-
----
-
-## 5. Deploy the frontend to Vercel
-1. vercel.com → **Add New → Project** → import your repo.
-2. Vercel should auto-detect Vite. If it asks:
-   - **Build command**: `npm run build`
-   - **Output directory**: `dist`
-3. Add environment variables before deploying:
-   | Name | Value |
-   |---|---|
-   | `VITE_SUPABASE_URL` | your Supabase Project URL |
-   | `VITE_SUPABASE_ANON_KEY` | your Supabase anon public key |
-4. Deploy. `vercel.json` in this project already handles the SPA routing fallback so
-   `/dashboard`, `/tasks` etc. work on refresh and direct links.
-
-**If you'd rather use Netlify instead:** same env vars, build command `npm run build`,
-publish directory `dist`, and add a `public/_redirects` file containing `/* /index.html 200`
-for the same SPA routing fix.
-
----
-
-## 6. Put it on your phone
-1. Open your deployed URL in your phone's browser.
-2. Sign up with email + password.
-3. Menu → **Add to Home Screen** — gives you a real tappable icon.
-4. Allow notifications when prompted — powers in-app alarms while the app is open.
-
----
-
-## 7. Using it
-- **Timetable**: upload a photo → AI fills in every class automatically, or add manually.
-- **Tasks**: Today / Pending / Later tabs. Mark done, **Shift** (new slot today), **Skip**
-  (auto-slotted into tomorrow), or **Later** (parked, restorable anytime). Anything left
-  unfinished at day's end auto-reschedules into today's free time next time you open the app.
-- **Dashboard**: live day-dial of today's classes, 14-day completion chart, tasks-per-day chart.
-- **Assistant**: chat that sees your goals, today's classes/tasks, and overdue items.
-
----
-
-## 8. Known limitations
-- Notifications only fire while the tab/PWA is open (browser Notification API, not true OS push).
-  Real push needs a service worker + a scheduled job — see Phase 2 below.
-- The assistant advises; it doesn't yet auto-rewrite your whole timetable.
-- No 3D avatar yet — text chat only for now.
-
-## 9. Phase 2 ideas
-- **True push notifications**: add a service worker, subscribe via the Web Push API, store the
-  subscription in a new Supabase table, and add a `pg_cron` job or a scheduled Edge Function that
-  checks upcoming events and pushes.
-- **3D robot assistant**: add `three.js` + `@react-three/fiber` to the Assistant page.
-- **Monthly goal planner**: add a `goals` table with milestones; a new Edge Function asks the AI
-  to break a goal into weekly tasks inserted into `tasks`.
-- **Full auto-reschedule engine**: extend `src/lib/scheduling.ts` to rebalance a whole overloaded
-  day at once, instead of one task at a time.
-"# student-time" 
+- Press **`a`** to launch on Android emulator/device.
+- Press **`i`** to launch on iOS simulator.
+- Scan the QR code using the **Expo Go** app on your phone.
