@@ -1,46 +1,51 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
-// The expo-notifications library (SDK 53+) throws an error when imported in Expo Go on Android
-// even if no functions are called. We use dynamic requires to avoid importing it at all in Expo Go.
+// expo-notifications does not support scheduled local notifications on web (throws UnavailabilityError).
+// Also on Android in Expo Go (SDK 53+), importing expo-notifications can cause a runtime crash.
+const isWeb = Platform.OS === "web";
 const isExpoGo = Constants.appOwnership === "expo";
-const shouldSkipNotifications = isExpoGo && Platform.OS === "android";
+const shouldSkipNotifications = isWeb || (isExpoGo && Platform.OS === "android");
 
-// We'll use this to hold the imported module
+// Holds the dynamically loaded module on supported native platforms
 let Notifications: any = null;
 
 if (!shouldSkipNotifications) {
-  // Use require to avoid top-level import crash
   try {
     Notifications = require("expo-notifications");
 
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
+    if (Notifications?.setNotificationHandler) {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    }
   } catch (err) {
     console.warn("Failed to initialize expo-notifications:", err);
   }
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (shouldSkipNotifications || !Notifications) {
+  if (shouldSkipNotifications || !Notifications?.getPermissionsAsync) {
+    if (isWeb) {
+      return false;
+    }
     console.warn("Notifications are disabled in Expo Go on Android to prevent crashes. Use a development build for full functionality.");
     return false;
   }
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     let status = existing;
-    if (existing !== "granted") {
+    if (existing !== "granted" && Notifications.requestPermissionsAsync) {
       const req = await Notifications.requestPermissionsAsync();
       status = req.status;
     }
-    if (Platform.OS === "android") {
+    if (Platform.OS === "android" && Notifications.setNotificationChannelAsync) {
       await Notifications.setNotificationChannelAsync("orbit-alarms-v2", {
         name: "Orbit alarms",
         importance: Notifications.AndroidImportance.MAX,
@@ -58,67 +63,83 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 /**
  * Schedules a WEEKLY REPEATING local notification for a timetable class.
+ * Safely returns null on web or unsupported platforms without throwing.
  */
 export async function scheduleClassAlarm(
   dayOfWeek: number, // 0=Sunday ... 6=Saturday (our DB convention)
   startTime: string, // "HH:MM"
   subject: string
-): Promise<string> {
-  if (shouldSkipNotifications || !Notifications) return "disabled-in-expo-go";
-  const [hour, minute] = startTime.split(":").map(Number);
-  const weekday = dayOfWeek + 1; // convert to expo's 1-7 convention
+): Promise<string | null> {
+  if (shouldSkipNotifications || !Notifications?.scheduleNotificationAsync) {
+    return null;
+  }
+  try {
+    const [hour, minute] = startTime.split(":").map(Number);
+    const weekday = dayOfWeek + 1; // convert to expo's 1-7 convention
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Class starting",
-      body: subject,
-      data: { kind: "class", subject },
-      ...Platform.select({ ios: { sound: true } }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-      weekday, // 1 = Sunday ... 7 = Saturday
-      hour,
-      minute,
-      channelId: "orbit-alarms-v2",
-    },
-  });
-  return id;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Class starting",
+        body: subject,
+        data: { kind: "class", subject },
+        ...Platform.select({ ios: { sound: true } }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday, // 1 = Sunday ... 7 = Saturday
+        hour,
+        minute,
+        channelId: "orbit-alarms-v2",
+      },
+    });
+    return id;
+  } catch (err) {
+    console.warn("Class alarm could not be scheduled on this platform:", err);
+    return null;
+  }
 }
 
 /**
  * Schedules a ONE-TIME local notification for a task at a specific date + time.
+ * Safely returns null on web or unsupported platforms without throwing.
  */
 export async function scheduleTaskAlarm(
   taskDate: string, // "YYYY-MM-DD"
   startTime: string, // "HH:MM"
   title: string
 ): Promise<string | null> {
-  if (shouldSkipNotifications || !Notifications) return null;
-  const [hour, minute] = startTime.split(":").map(Number);
-  const [year, month, day] = taskDate.split("-").map(Number);
-  const fireDate = new Date(year, month - 1, day, hour, minute, 0);
+  if (shouldSkipNotifications || !Notifications?.scheduleNotificationAsync) {
+    return null;
+  }
+  try {
+    const [hour, minute] = startTime.split(":").map(Number);
+    const [year, month, day] = taskDate.split("-").map(Number);
+    const fireDate = new Date(year, month - 1, day, hour, minute, 0);
 
-  if (fireDate.getTime() <= Date.now()) return null; // don't schedule for the past
+    if (fireDate.getTime() <= Date.now()) return null; // don't schedule for the past
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Task time",
-      body: title,
-      data: { kind: "task", title },
-      ...Platform.select({ ios: { sound: true } }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: fireDate,
-      channelId: "orbit-alarms-v2",
-    },
-  });
-  return id;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Task time",
+        body: title,
+        data: { kind: "task", title },
+        ...Platform.select({ ios: { sound: true } }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: fireDate,
+        channelId: "orbit-alarms-v2",
+      },
+    });
+    return id;
+  } catch (err) {
+    console.warn("Task alarm could not be scheduled on this platform:", err);
+    return null;
+  }
 }
 
 export async function cancelAlarm(notifId: string | null) {
-  if (!notifId || shouldSkipNotifications || !Notifications) return;
+  if (!notifId || shouldSkipNotifications || !Notifications?.cancelScheduledNotificationAsync) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(notifId);
   } catch {
@@ -127,16 +148,16 @@ export async function cancelAlarm(notifId: string | null) {
 }
 
 export async function cancelAllAlarms() {
-  if (shouldSkipNotifications || !Notifications) return;
+  if (shouldSkipNotifications || !Notifications?.cancelAllScheduledNotificationsAsync) return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch (err) {
-    console.error("Failed to cancel all notifications:", err);
+  } catch {
+    // safe to ignore
   }
 }
 
 export async function getScheduledAlarms(): Promise<any[]> {
-  if (shouldSkipNotifications || !Notifications) return [];
+  if (shouldSkipNotifications || !Notifications?.getAllScheduledNotificationsAsync) return [];
   try {
     return await Notifications.getAllScheduledNotificationsAsync();
   } catch {

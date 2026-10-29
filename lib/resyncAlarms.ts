@@ -1,8 +1,14 @@
+import { Platform } from "react-native";
 import { supabase } from "./supabaseClient";
 import { scheduleClassAlarm, scheduleTaskAlarm, cancelAllAlarms } from "./notifications";
 import { todayStr } from "./scheduling";
 
 export async function resyncAlarms() {
+  if (Platform.OS === "web") {
+    // Scheduled notifications are native to iOS & Android. Skip on web preview.
+    return;
+  }
+
   await cancelAllAlarms();
 
   const { data: classes } = await supabase
@@ -13,7 +19,9 @@ export async function resyncAlarms() {
   for (const c of classes ?? []) {
     try {
       const id = await scheduleClassAlarm(c.day_of_week, c.start_time, c.subject);
-      await supabase.from("timetable_events").update({ notif_id: id }).eq("id", c.id);
+      if (id) {
+        await supabase.from("timetable_events").update({ notif_id: id }).eq("id", c.id);
+      }
     } catch (e) {
       console.error("Class alarm failed:", c.subject, e);
     }
@@ -30,7 +38,9 @@ export async function resyncAlarms() {
   for (const t of tasks ?? []) {
     try {
       const id = await scheduleTaskAlarm(t.task_date, t.start_time, t.title);
-      await supabase.from("tasks").update({ notif_id: id }).eq("id", t.id);
+      if (id) {
+        await supabase.from("tasks").update({ notif_id: id }).eq("id", t.id);
+      }
     } catch (e) {
       console.error("Task alarm failed:", t.title, e);
     }
